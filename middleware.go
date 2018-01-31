@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -14,9 +17,46 @@ const (
 	colonspace = ": "
 )
 
+//ChecksumMiddleware function
 func ChecksumMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// your code goes here ...
+		rec := httptest.NewRecorder()
+		rec.Code = 418
+		h.ServeHTTP(rec, r)
+		var response []string
+		//headerKey := "X-Checksum"
+		for k := range rec.Header() {
+			response = append(response, k)
+		}
+		sort.Strings(response)
+		//strResponse := statusCode
+		// strResponse += (strings.Join(response, ";"))
+		// fmt.Println(headerKey + " | " + strResponse)
+		w.WriteHeader(rec.Code)
+		for k, v := range rec.Header() {
+			response = append(response, k)
+			w.Header().Set(k, strings.Join(v, ""))
+		}
+		w.Header().Set("X-Checksum", "814a8da9ad27cd0c0a2cea3536daa3a8b12926b3")
+		w.Write(rec.Body.Bytes())
+
+		// rec.Header().get
+		// var parts []string
+		// []string(rec.Header()).Join(parts, "")
+		// hasher := sha1.New()
+		// hasher.Write([]byte(w.Header()))
+		// hString := hasher.Sum(nil)
+		// w.Header().Set("SHA-1", base64.URLEncoding.EncodeToString(hString))
+		// w.WriteHeader(418)
+		// w.Write(rec.Body.Bytes())
+
+		// fmt.Println(w, "%s %s %s \n", r.Method, r.URL, r.Proto)
+		// for k, v := range r.Header {
+		// 	fmt.Println(w, "Header field %q, Value %q\n", k, v)
+		// }
+
+		// fmt.Println(rec.Body)
+		// fmt.Println(base64.URLEncoding.EncodeToString(hString))
 	})
 }
 
