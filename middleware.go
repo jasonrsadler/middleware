@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -21,42 +23,49 @@ const (
 func ChecksumMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := httptest.NewRecorder()
-		rec.Code = 418
 		h.ServeHTTP(rec, r)
+
+		//get recorded headers
 		var response []string
-		//headerKey := "X-Checksum"
-		for k := range rec.Header() {
-			response = append(response, k)
+		for k, v := range rec.Header() {
+			for _, val := range v {
+				response = append(response, fmt.Sprintf("%s: %s\r\n", k, val))
+			}
 		}
-		sort.Strings(response)
-		//strResponse := statusCode
-		// strResponse += (strings.Join(response, ";"))
-		// fmt.Println(headerKey + " | " + strResponse)
-		w.WriteHeader(rec.Code)
+		sort.Strings(response) //lexico
+
+		//build 'X-Checksum-Headers'
+		var ckH []string
+		for k := range rec.Header() {
+			ckH = append(ckH, k)
+		}
+		ckHName := "X-Checksum-Headers"
+		sort.Strings(ckH)
+		var xCksmH = strings.Join(ckH, ";")
+
+		//build the canonical response
+		var fResp []string
+		fResp = append(fResp, strconv.Itoa(rec.Code)+crlf+strings.Join(response, "")+ckHName+colonspace+xCksmH+crlf+crlf+string(rec.Body.Bytes()))
+		var canonicalResponse = strings.Join(fResp, "")
+
+		//hash the canoncial response
+		hash := sha1.New()
+		hash.Write([]byte(canonicalResponse))
+		xChecksum := hex.EncodeToString(hash.Sum(nil))
+
+		//set headers
+		w.Header().Set(ckHName, xCksmH)
+		w.Header().Set("X-Checksum", xChecksum)
 		for k, v := range rec.Header() {
 			response = append(response, k)
 			w.Header().Set(k, strings.Join(v, ""))
 		}
-		w.Header().Set("X-Checksum", "814a8da9ad27cd0c0a2cea3536daa3a8b12926b3")
+
+		//write out headers
+		w.WriteHeader(rec.Code)
+
+		//send the body
 		w.Write(rec.Body.Bytes())
-
-		// rec.Header().get
-		// var parts []string
-		// []string(rec.Header()).Join(parts, "")
-		// hasher := sha1.New()
-		// hasher.Write([]byte(w.Header()))
-		// hString := hasher.Sum(nil)
-		// w.Header().Set("SHA-1", base64.URLEncoding.EncodeToString(hString))
-		// w.WriteHeader(418)
-		// w.Write(rec.Body.Bytes())
-
-		// fmt.Println(w, "%s %s %s \n", r.Method, r.URL, r.Proto)
-		// for k, v := range r.Header {
-		// 	fmt.Println(w, "Header field %q, Value %q\n", k, v)
-		// }
-
-		// fmt.Println(rec.Body)
-		// fmt.Println(base64.URLEncoding.EncodeToString(hString))
 	})
 }
 

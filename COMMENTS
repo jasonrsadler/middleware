@@ -1,0 +1,2 @@
+Package can be run with 'go run middleware.go' (assuming port 8080 is not in use)
+running curl against the handler sends a checksum header with the value '016858b824090bcd4e02c41e608416397200db10'
